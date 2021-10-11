@@ -1,0 +1,80 @@
+﻿<Window x:Class="PasswordManager.InputForm"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="InputForm" Height="450" Width="800">
+    <ItemsControl ItemsSource="{Binding Path=., Mode=TwoWay}" VerticalAlignment="Stretch" VerticalContentAlignment="Stretch">
+        <Grid Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="30*"/>
+                <RowDefinition Height="30*"/>
+                <RowDefinition Height="1*"/>
+            </Grid.RowDefinitions>
+
+            <ListBox HorizontalAlignment="Stretch" Grid.Row="0">
+                <Image Source="{Binding Img}" Width="32" Height="32" />
+                <ListBoxItem HorizontalContentAlignment="Stretch" x:Name="アカウントID">
+                    <Grid Margin="10,0,10,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="3*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="アカウントID"  FontSize="16" Grid.Column="0"/>
+                        <TextBox Text="{Binding AccountID}" FontSize="16" Grid.Column="1"/>
+                    </Grid>
+                </ListBoxItem>
+                <ListBoxItem HorizontalContentAlignment="Stretch" x:Name="パスワード">
+                    <Grid Margin="10,0,10,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="3*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="パスワード" FontSize="16" Grid.Column="0"/>
+                        <TextBox Text="{Binding Password}" FontSize="16" Grid.Column="1"/>
+                    </Grid>
+                </ListBoxItem>
+                <ListBoxItem HorizontalContentAlignment="Stretch" x:Name="URL">
+                    <Grid Margin="10,0,10,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="3*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="URL" FontSize="16" Grid.Column="0"/>
+                        <TextBox Text="{Binding URL}" FontSize="16" Grid.Column="1"/>
+                    </Grid>
+                </ListBoxItem>
+                <ListBoxItem HorizontalContentAlignment="Stretch" x:Name="紐付けされたアドレス">
+                    <Grid Margin="10,0,10,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="3*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="紐付けされたアドレス" FontSize="16" Grid.Column="0"/>
+                        <TextBox Text="{Binding BindAddress}" FontSize="16" Grid.Column="1"/>
+                    </Grid>
+                </ListBoxItem>
+            </ListBox>
+            <ListBox ItemsSource="{Binding Others}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Grid.Row="1">
+                <ListBox.ItemTemplate>
+                    <DataTemplate >
+                        <Grid Margin="10,0,10,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*"/>
+                                <ColumnDefinition Width="3*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Key}"  FontSize="16" Grid.Column="0"/>
+                            <TextBox Text="{Binding Value}" FontSize="16" Grid.Column="1"/>
+                        </Grid>
+                    </DataTemplate>
+
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Button Content="項目の追加" Grid.Row="2" HorizontalAlignment="Right" FontSize="16" Margin="10" Click="Button_Click"/>
+        </Grid>
+
+
+    </ItemsControl>
+</Window>
