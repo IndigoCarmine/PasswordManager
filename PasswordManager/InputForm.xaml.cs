@@ -17,9 +17,9 @@ namespace PasswordManager
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            var PassForm = new PasswordForm("追加したい要素名を入力してください。");
-            PassForm.ShowDialog();
-            string key = PassForm.Value;
+            var NForm = new NormalForm("追加したい要素名を入力してください。");
+            NForm.ShowDialog();
+            string key = NForm.Value;
             SelectedData.Others.Add(new Other() { Key = key });
         }
     }

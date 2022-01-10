@@ -10,6 +10,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -29,7 +30,7 @@ namespace PasswordManager
 
         Settings settings;
         string password;
-
+        
         public MainWindow()
         {
             InitializeComponent();
@@ -103,7 +104,7 @@ namespace PasswordManager
                 byte[] decstr;
                 try
                 {
-                    decstr = DecryptString(v.ReadBytes((int)v.BaseStream.Length), password);
+                    decstr = Cryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password);
                     using (MemoryStream memoryStream = new MemoryStream(decstr))
                     {
 
@@ -165,7 +166,7 @@ namespace PasswordManager
 
 
 
-                    byte[] bytedata = EncryptString(memoryStream.ToArray(), password);
+                    byte[] bytedata = Cryptography.EncryptString(memoryStream.ToArray(), password);
                     v.Write(bytedata, 0, bytedata.Length);
                 }
 
@@ -240,95 +241,6 @@ namespace PasswordManager
             }
         }
 
-        //拝借したもの
-        /// <summary>
-        /// 文字列を暗号化する
-        /// </summary>
-        /// <param name="sourceString">暗号化する文字列</param>
-        /// <param name="password">暗号化に使用するパスワード</param>
-        /// <returns>暗号化された文字列</returns>
-        public static byte[] EncryptString(byte[] strBytes, string password)
-        {
-            //RijndaelManagedオブジェクトを作成
-            System.Security.Cryptography.RijndaelManaged rijndael =
-                new System.Security.Cryptography.RijndaelManaged();
-
-            //パスワードから共有キーと初期化ベクタを作成
-            GenerateKeyFromPassword(
-                password, rijndael.KeySize, out byte[] key, rijndael.BlockSize, out byte[] iv);
-            rijndael.Key = key;
-            rijndael.IV = iv;
-
-            //対称暗号化オブジェクトの作成
-            System.Security.Cryptography.ICryptoTransform encryptor =
-                rijndael.CreateEncryptor();
-            //バイト型配列を暗号化する
-            byte[] encBytes = encryptor.TransformFinalBlock(strBytes, 0, strBytes.Length);
-            //閉じる
-            encryptor.Dispose();
-
-            //バイト型配列を文字列に変換して返す
-            return encBytes;
-        }
-
-        /// <summary>
-        /// 暗号化された文字列を復号化する
-        /// </summary>
-        /// <param name="sourceString">暗号化された文字列</param>
-        /// <param name="password">暗号化に使用したパスワード</param>
-        /// <returns>復号化された文字列</returns>
-        public static byte[] DecryptString(byte[] strBytes, string password)
-        {
-            //RijndaelManagedオブジェクトを作成
-            System.Security.Cryptography.RijndaelManaged rijndael =
-                new System.Security.Cryptography.RijndaelManaged();
-
-            //パスワードから共有キーと初期化ベクタを作成
-            GenerateKeyFromPassword(
-                password, rijndael.KeySize, out byte[] key, rijndael.BlockSize, out byte[] iv);
-            rijndael.Key = key;
-            rijndael.IV = iv;
-
-
-            //対称暗号化オブジェクトの作成
-            System.Security.Cryptography.ICryptoTransform decryptor =
-                rijndael.CreateDecryptor();
-            //バイト型配列を復号化する
-            //復号化に失敗すると例外CryptographicExceptionが発生
-            byte[] decBytes = decryptor.TransformFinalBlock(strBytes, 0, strBytes.Length);
-            //閉じる
-            decryptor.Dispose();
-
-            //バイト型配列を文字列に戻して返す
-            return decBytes;
-        }
-
-        /// <summary>
-        /// パスワードから共有キーと初期化ベクタを生成する
-        /// </summary>
-        /// <param name="password">基になるパスワード</param>
-        /// <param name="keySize">共有キーのサイズ（ビット）</param>
-        /// <param name="key">作成された共有キー</param>
-        /// <param name="blockSize">初期化ベクタのサイズ（ビット）</param>
-        /// <param name="iv">作成された初期化ベクタ</param>
-        private static void GenerateKeyFromPassword(string password, int keySize, out byte[] key, int blockSize, out byte[] iv)
-        {
-            //パスワードから共有キーと初期化ベクタを作成する
-            //saltを決める
-            byte[] salt = System.Text.Encoding.UTF8.GetBytes("saltは必ず8バイト以上");
-            //Rfc2898DeriveBytesオブジェクトを作成する
-            Rfc2898DeriveBytes deriveBytes =
-                new Rfc2898DeriveBytes(password, salt);
-            //.NET Framework 1.1以下の時は、PasswordDeriveBytesを使用する
-            //System.Security.Cryptography.PasswordDeriveBytes deriveBytes =
-            //    new System.Security.Cryptography.PasswordDeriveBytes(password, salt);
-            //反復処理回数を指定する デフォルトで1000回
-            deriveBytes.IterationCount = 1000;
-
-            //共有キーと初期化ベクタを生成する
-            key = deriveBytes.GetBytes(keySize / 8);
-            iv = deriveBytes.GetBytes(blockSize / 8);
-        }
 
         private void CheckBox_Checked(object sender, RoutedEventArgs e)
         {
@@ -349,7 +261,15 @@ namespace PasswordManager
             set
             {
                 _URL = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Img"));
+                var task = new Task(() =>
+                 {
+                     ImageSource image;
+                     
+                     image = ImageSourceConvert.ToImageSource(LoadfaviconFromURL(URL));
+                   
+                 });
+                task.Start();
+
             }
         }
         public string Password { get; set; }
@@ -357,15 +277,22 @@ namespace PasswordManager
         public ObservableCollection<Other> Others { get; set; }
 
         [XmlIgnore]
-        public string _URL;
+        private string _URL;
         [XmlIgnore]
         public ImageSource Img
         {
+            set
+            {
+                _Img = value;
+            }
             get
             {
-                return ImageSourceConvert.ToImageSource(LoadfaviconFromURL(URL));
+                if (_Img == null) return ImageSourceConvert.ToImageSource(Properties.Resources.disco);
+                return _Img;
             }
         }
+        [XmlIgnore]
+        private ImageSource _Img;
         [XmlIgnore]
         public ICommand ClipPassword { get; private set; }
         [XmlIgnore]
@@ -391,6 +318,11 @@ namespace PasswordManager
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        private Task<ImageSource> GetImageSource(string URL)
+        {
+            return Task.Run(()=> { return ImageSourceConvert.ToImageSource(LoadfaviconFromURL(URL)); });
+        }
 
         /// <summary>
         /// 指定されたURLの画像をImage型オブジェクトとして取得する
