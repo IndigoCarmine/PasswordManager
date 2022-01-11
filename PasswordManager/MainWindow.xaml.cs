@@ -16,6 +16,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using System.Xml;
 using System.Xml.Serialization;
 
@@ -196,7 +197,7 @@ namespace PasswordManager
         }
         public void AddData(object sender, RoutedEventArgs e)
         {
-            Data data = new Data();
+            Data data = new Data(this.Dispatcher);
             data.ShowWindow.Execute(null);
             BindingDataList.Add(data);
         }
@@ -254,6 +255,7 @@ namespace PasswordManager
 
     public class Data : INotifyPropertyChanged
     {
+        #region 記録される内容
         public string AccountID { get; set; }
         public string URL
         {
@@ -264,9 +266,9 @@ namespace PasswordManager
                 var task = new Task(() =>
                  {
                      ImageSource image;
-                     
+
                      image = ImageSourceConvert.ToImageSource(LoadfaviconFromURL(URL));
-                   
+                     MainWindowDispatcher.Invoke(() => { Img = image; });
                  });
                 task.Start();
 
@@ -276,6 +278,10 @@ namespace PasswordManager
         public string BindAddress { get; set; }
         public ObservableCollection<Other> Others { get; set; }
 
+        #endregion
+
+        [XmlIgnore]
+        private Dispatcher MainWindowDispatcher;
         [XmlIgnore]
         private string _URL;
         [XmlIgnore]
@@ -299,10 +305,11 @@ namespace PasswordManager
         public ICommand ShowWindow { get; private set; }
         [XmlIgnore]
         public ICommand ShowPassword { get; set; }
-        [XmlIgnore]
+
         public System.Windows.Visibility Passwordb { get; set; }
-        public Data()
+        public Data(Dispatcher dispatcher)
         {
+            MainWindowDispatcher = dispatcher;
             Passwordb = System.Windows.Visibility.Hidden;
             Others = new ObservableCollection<Other>();
             ClipPassword = new SimpleCommand(() => Clipboard.SetText(Password));
@@ -316,13 +323,7 @@ namespace PasswordManager
                 Passwordb = System.Windows.Visibility.Visible;
             });
         }
-
         public event PropertyChangedEventHandler PropertyChanged;
-
-        private Task<ImageSource> GetImageSource(string URL)
-        {
-            return Task.Run(()=> { return ImageSourceConvert.ToImageSource(LoadfaviconFromURL(URL)); });
-        }
 
         /// <summary>
         /// 指定されたURLの画像をImage型オブジェクトとして取得する
