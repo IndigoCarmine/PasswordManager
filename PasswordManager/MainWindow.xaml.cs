@@ -305,7 +305,7 @@ namespace PasswordManager
         public ICommand ShowWindow { get; private set; }
         [XmlIgnore]
         public ICommand ShowPassword { get; set; }
-
+        [XmlIgnore]
         public System.Windows.Visibility Passwordb { get; set; }
         public Data(Dispatcher dispatcher)
         {
