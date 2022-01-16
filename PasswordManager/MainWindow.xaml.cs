@@ -197,7 +197,7 @@ namespace PasswordManager
         }
         public void AddData(object sender, RoutedEventArgs e)
         {
-            Data data = new Data(this.Dispatcher);
+            Data data = new Data();
             data.ShowWindow.Execute(null);
             BindingDataList.Add(data);
         }
@@ -263,15 +263,16 @@ namespace PasswordManager
             set
             {
                 _URL = value;
+                /*
                 var task = new Task(() =>
                  {
                      ImageSource image;
 
                      image = ImageSourceConvert.ToImageSource(LoadfaviconFromURL(URL));
-                     MainWindowDispatcher.Invoke(() => { Img = image; });
+                     App.Current.Dispatcher.Invoke(() => Img = image);
                  });
                 task.Start();
-
+                */
             }
         }
         public string Password { get; set; }
@@ -280,8 +281,6 @@ namespace PasswordManager
 
         #endregion
 
-        [XmlIgnore]
-        private Dispatcher MainWindowDispatcher;
         [XmlIgnore]
         private string _URL;
         [XmlIgnore]
@@ -307,9 +306,8 @@ namespace PasswordManager
         public ICommand ShowPassword { get; set; }
         [XmlIgnore]
         public System.Windows.Visibility Passwordb { get; set; }
-        public Data(Dispatcher dispatcher)
+        public Data()
         {
-            MainWindowDispatcher = dispatcher;
             Passwordb = System.Windows.Visibility.Hidden;
             Others = new ObservableCollection<Other>();
             ClipPassword = new SimpleCommand(() => Clipboard.SetText(Password));
