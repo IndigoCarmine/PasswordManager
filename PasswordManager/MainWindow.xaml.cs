@@ -7,6 +7,8 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -197,7 +199,7 @@ namespace PasswordManager
         }
         public void AddData(object sender, RoutedEventArgs e)
         {
-            Data data = new Data(this.Dispatcher);
+            Data data = new Data();
             data.ShowWindow.Execute(null);
             BindingDataList.Add(data);
         }
@@ -256,32 +258,64 @@ namespace PasswordManager
     public class Data : INotifyPropertyChanged
     {
         #region 記録される内容
-        public string AccountID { get; set; }
+        public string AccountID
+        {
+            get
+            {
+                return _AccountID;
+            }
+            set
+            {
+                _AccountID = value;
+                NotifyPropertyChanged();
+            }
+        }
+
         public string URL
         {
-            get { return _URL; }
+            get { 
+                return _URL;
+            }
             set
             {
                 _URL = value;
-                var task = new Task(() =>
-                 {
-                     ImageSource image;
-
-                     image = ImageSourceConvert.ToImageSource(LoadfaviconFromURL(URL));
-                     MainWindowDispatcher.Invoke(() => { Img = image; });
-                 });
-                task.Start();
-
+                NotifyPropertyChanged();
             }
         }
-        public string Password { get; set; }
-        public string BindAddress { get; set; }
+        public string Password
+        {
+            get
+            {
+                return _Password;
+            }
+            set
+            {
+                _Password = value;
+                NotifyPropertyChanged();
+            }
+        }
+        public string BindAddress
+        {
+            get
+            {
+                return _BindAddress;
+            }
+            set
+            {
+                _BindAddress = value;
+                NotifyPropertyChanged();
+            }
+        }
         public ObservableCollection<Other> Others { get; set; }
 
         #endregion
 
         [XmlIgnore]
-        private Dispatcher MainWindowDispatcher;
+        private string _AccountID;
+        [XmlIgnore]
+        private string _Password;
+        [XmlIgnore]
+        private string _BindAddress;
         [XmlIgnore]
         private string _URL;
         [XmlIgnore]
@@ -290,6 +324,8 @@ namespace PasswordManager
             set
             {
                 _Img = value;
+                NotifyPropertyChanged();
+
             }
             get
             {
@@ -307,9 +343,8 @@ namespace PasswordManager
         public ICommand ShowPassword { get; set; }
         [XmlIgnore]
         public System.Windows.Visibility Passwordb { get; set; }
-        public Data(Dispatcher dispatcher)
+        public Data()
         {
-            MainWindowDispatcher = dispatcher;
             Passwordb = System.Windows.Visibility.Hidden;
             Others = new ObservableCollection<Other>();
             ClipPassword = new SimpleCommand(() => Clipboard.SetText(Password));
@@ -322,69 +357,75 @@ namespace PasswordManager
             {
                 Passwordb = System.Windows.Visibility.Visible;
             });
+            AddPropertyChangedHandler("URL", async () => Img = await LoadfaviconFromURL(_URL));
         }
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler PropertyChanged = (o, e) => { };
+
+        public void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void AddPropertyChangedHandler(string propertyName, Action action)
+        {
+            if (action == null) throw new ArgumentNullException("action");
+
+            PropertyChanged += (o, e) =>
+            {
+                if (e.PropertyName == propertyName)
+                {
+                    action();
+                }
+            };
+        }
 
         /// <summary>
         /// 指定されたURLの画像をImage型オブジェクトとして取得する
         /// </summary>
         /// <param name="url">画像データのURL(ex: http://example.com/foo.jpg) </param>
         /// <returns>         画像データ</returns>
-        private Bitmap LoadfaviconFromURL(string url)
+        private async Task<ImageSource> LoadfaviconFromURL(string url)
         {
-            int buffSize = 65536; // 一度に読み込むサイズ
-            MemoryStream imgStream = new MemoryStream();
 
+ 
             //------------------------
             // パラメータチェック
             //------------------------
             if (url == null || url.Trim().Length <= 0)
             {
-                return Properties.Resources.disco;
+                return ImageSourceConvert.ToImageSource(Properties.Resources.disco);
             }
-            Console.WriteLine(url);
             if (!("/" == url.Substring(url.Length)))
             {
                 url += "/";
             }
+            url += "favicon.ico";
             //----------------------------
             // Webサーバに要求を投げる
-            //----------------------------
-            try
+            //----------------------------           
+            using (var client = new HttpClient())
             {
-                WebRequest req = WebRequest.Create(url + "favicon.ico");
-                BinaryReader reader = new BinaryReader(req.GetResponse().GetResponseStream());
-                //--------------------------------------------------------
-                // Webサーバからの応答データを取得し、imgStreamに保存する
-                //--------------------------------------------------------
-                while (true)
+                client.Timeout = new TimeSpan(0, 0, 10);
+                try
                 {
-                    byte[] buff = new byte[buffSize];
-
-                    // 応答データの取得
-                    int readBytes = reader.Read(buff, 0, buffSize);
-                    if (readBytes <= 0)
+                    byte[] response = await client.GetByteArrayAsync(url);
+                    using (MemoryStream imgStream = new MemoryStream(response))
                     {
-                        // 最後まで取得した->ループを抜ける
-                        break;
+                        var bitmap = new Bitmap(imgStream);
+                        if (bitmap == null)
+                        {
+                            bitmap = Properties.Resources.disco;
+                        }
+                    
+                        return ImageSourceConvert.ToImageSource(bitmap);
                     }
-
-                    // バッファに追加
-                    imgStream.Write(buff, 0, readBytes);
+                }
+                catch(HttpRequestException) 
+                {
+                    return ImageSourceConvert.ToImageSource(Properties.Resources.disco);
                 }
             }
-            catch
-            {
-                return Properties.Resources.disco;
-            }
-
-
-            Bitmap bitmap = new Bitmap(imgStream);
-            if (bitmap == null)
-            {
-                bitmap = Properties.Resources.disco;
-            }
-            return bitmap;
+                
 
         }
     }
