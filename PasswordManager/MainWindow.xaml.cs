@@ -6,7 +6,6 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -18,7 +17,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using System.Xml;
 using System.Xml.Serialization;
 
@@ -50,6 +48,7 @@ namespace PasswordManager
                         break;
                     case MessageBoxResult.No:
                         e.Cancel = false;
+                        SaveSettings();
                         break;
                     case MessageBoxResult.Cancel:
                         e.Cancel = true;
@@ -342,12 +341,12 @@ namespace PasswordManager
         [XmlIgnore]
         public ICommand ShowPassword { get; set; }
         [XmlIgnore]
-        public System.Windows.Visibility Passwordb { get; set; }
+        public Visibility Passwordb { get; set; }
         public Data()
         {
-            Passwordb = System.Windows.Visibility.Hidden;
+            Passwordb = Visibility.Hidden;
             Others = new ObservableCollection<Other>();
-            ClipPassword = new SimpleCommand(() => Clipboard.SetText(Password));
+            ClipPassword = new SimpleCommand(() => ClipboardService.SetText(Password));
             ShowWindow = new SimpleCommand(() => {
                 InputForm window = new InputForm(this);
                 window.Show();
@@ -355,7 +354,7 @@ namespace PasswordManager
             });
             ShowPassword = new SimpleCommand(() =>
             {
-                Passwordb = System.Windows.Visibility.Visible;
+                Passwordb = Visibility.Visible;
             });
             AddPropertyChangedHandler("URL", async () => Img = await LoadfaviconFromURL(_URL));
         }
