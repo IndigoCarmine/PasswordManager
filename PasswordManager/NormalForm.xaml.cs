@@ -7,19 +7,18 @@ namespace PasswordManager
     /// </summary>
     public partial class NormalForm : Window
     {
-        public string Value { get; set; }
+        public string? Value { get; set; }
 
         public NormalForm(string Message)
         {
             this.DataContext = Message;
             InitializeComponent();
-            Password.Focus();
 
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            Value = Password.Text;
+            Value = Text.Text;
             this.Close();
         }
 
@@ -29,9 +28,12 @@ namespace PasswordManager
             this.Close();
         }
 
-        private void Password_KeyDown(object sender, KeyEventArgs e)
+        private void OnKeyDownHandler(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter) Button_Click(null, null);
+
+            //引数は適当
+            if (e.Key == Key.Enter) Button_Click(0, new RoutedEventArgs());
         }
+
     }
 }

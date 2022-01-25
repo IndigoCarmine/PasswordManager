@@ -25,10 +25,10 @@ namespace PasswordManager
     /// </summary>
     public partial class MainWindow : Window
     {
-        ObservableCollection<Data> BindingDataList = new ObservableCollection<Data>();
+        readonly ObservableCollection<Data> BindingDataList = new();
 
-        Settings settings;
-        string password;
+        Settings? settings;
+        string? password;
         
         public MainWindow()
         {
@@ -62,66 +62,115 @@ namespace PasswordManager
        
         private void Initalize()
         {
-
-            if (!File.Exists("settings.xml"))
+            bool SettingFlileExist = File.Exists("settings.xml");
+            if (!SettingFlileExist)
             {
-                //初回起動
-                settings = new Settings();
-            }
-            else
-            {
-                //二回目以降
-                ImportSetting();
-                if (settings.UseTheSameFile)
+                var result = MessageBox.Show("初回起動ですか。", "選択", MessageBoxButton.YesNo, MessageBoxImage.Error);
+                if (result == MessageBoxResult.Yes)
                 {
-                    var PassForm = new PasswordForm("パスワードを入力してください。");
-                    PassForm.ShowDialog();
-                    password = PassForm.Value;
-                    ImportData();
+                    //初回
+                    ShowIntroduction();
+                    this.DataContext = BindingDataList;
+                    return;
                 }
+            }
+            bool ReadSuccess = ImportSetting();
+            while (!(SettingFlileExist || ReadSuccess))
+            {
+                //設定ファイル紛失の２回目以降
+                var path = OpenFile();
+                if (path == null)
+                {
+                    MessageBox.Show("ファイルが選択されていません。終了します。");
+                    this.Close();
+                }
+                else
+                {
+                    settings = new() { DefaultFilePath = path };
+                    SaveSettings();
+
+                }
+                ReadSuccess = ImportSetting();
+            }
+
+            //二回目以降
+            if (settings!.UseTheSameFile)
+            {
+                var PassForm = new PasswordForm("パスワードを入力してください。");
+                PassForm.ShowDialog();
+                password = PassForm.Value;
+                ImportData();
             }
             this.DataContext = BindingDataList;
 
+            return;
+
+
         }
         /// <summary>
-        /// Passwordの取得と配置
+        /// 紹介のなにかを表示する。
         /// </summary>
+        static private void ShowIntroduction()
+        {
+
+        }
+        static private string? OpenFile()
+        {
+            OpenFileDialog dialog = new()
+            {
+                Multiselect = false,
+                Title = "作成済みのデータファイルを選択してください。",
+                AddExtension = true,
+                CheckFileExists = true,
+                Filter = "PWM Files (*.pwm)|*.pwm"
+            };
+            if ((bool)dialog.ShowDialog()!)
+            { 
+                return dialog.FileName;
+            }
+            else
+            {
+                return null;
+            }
+        }
         private void ImportData()
         {
-            if (settings == null)
-            {
-                Select_File();
-            }
-            else if (!File.Exists(settings.DefaultFilePath))
+            if (!File.Exists(settings!.DefaultFilePath))
             {
                 MessageBox.Show("ファイルが存在しません。消去または、移動された可能性があります。");
                 return;
             }
-            XmlSerializer serializer = new XmlSerializer(typeof(ObservableCollection<Data>));
-            using (BinaryReader v = new BinaryReader(new FileStream(settings.DefaultFilePath, FileMode.Open)))
+            else
             {
-                if (v.BaseStream.Length == 0) return;
-                byte[] decstr;
-                try
-                {
-                    decstr = Cryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password);
-                    using (MemoryStream memoryStream = new MemoryStream(decstr))
-                    {
+                XmlSerializer serializer = new(typeof(ObservableCollection<Data>));
 
-                        BindingDataList.Clear();
-                        foreach (Data data in (ObservableCollection<Data>)serializer.Deserialize(memoryStream))
+                using (BinaryReader v = new(new FileStream(settings!.DefaultFilePath!, FileMode.Open)))
+                {
+                    if (v.BaseStream.Length == 0) return;
+                    byte[] decstr;
+                    try
+                    {
+                        decstr = Cryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password!);
+                        using (MemoryStream memoryStream = new(decstr))
                         {
-                            BindingDataList.Add(data);
+
+                            BindingDataList.Clear();
+                            foreach (Data data in (ObservableCollection<Data>)(serializer.Deserialize(memoryStream)!))
+                            {
+                                BindingDataList.Add(data);
+                            }
                         }
                     }
+                    catch (CryptographicException)
+                    {
+                        var PassForm = new PasswordForm("パスワードが間違っています。再入力してください。");
+                        PassForm.ShowDialog();
+                        password = PassForm.Value;
+                        ImportData();
+                        return;
+                    }
                 }
-                catch (CryptographicException)
-                {
-                    var PassForm = new PasswordForm("パスワードが間違っています。再入力してください。");
-                    PassForm.ShowDialog();
-                    password = PassForm.Value;
-                    return;
-                }
+
             }
 
         }
@@ -134,38 +183,29 @@ namespace PasswordManager
                 PassForm.ShowDialog();
                 password = PassForm.Value;
             }
-
-
-            if (settings == null || settings.DefaultFilePath == null)
+            while (settings == null || settings.DefaultFilePath == null)
             {
-                while (!Select_File())
+                MessageBoxResult messageboxResult = MessageBox.Show("ファイルを選択しないと保存できません。 \n 選択しますか。", "選択", MessageBoxButton.YesNo, MessageBoxImage.Error);
+                switch (messageboxResult)
                 {
-                    MessageBoxResult messageboxResult = MessageBox.Show("ファイルを選択しないと保存できません。 \n 選択しますか。", "選択", MessageBoxButton.YesNo, MessageBoxImage.Error);
-                    switch (messageboxResult)
-                    {
-                        case MessageBoxResult.Yes:
-                            break;
-                        case MessageBoxResult.No:
-                            return false;
-                        default:
-                            break;
-                    }
-
+                    case MessageBoxResult.Yes:
+                        break;
+                    case MessageBoxResult.No:
+                        return false;
+                    default:
+                        break;
                 }
-
+                var path = OpenFile();
+                if (path == null) break;
+                settings = new() { DefaultFilePath = path };
             }
 
-            XmlSerializer serializer = new XmlSerializer(typeof(ObservableCollection<Data>));
-            using (BinaryWriter v = new BinaryWriter(new FileStream(settings.DefaultFilePath, FileMode.OpenOrCreate)))
+            XmlSerializer serializer = new(typeof(ObservableCollection<Data>));
+            using (BinaryWriter v = new(new FileStream(settings!.DefaultFilePath!, FileMode.OpenOrCreate)))
             {
-
-                using (MemoryStream memoryStream = new MemoryStream())
+                using (MemoryStream memoryStream = new())
                 {
-
                     serializer.Serialize(memoryStream, BindingDataList);
-
-
-
                     byte[] bytedata = Cryptography.EncryptString(memoryStream.ToArray(), password);
                     v.Write(bytedata, 0, bytedata.Length);
                 }
@@ -174,40 +214,62 @@ namespace PasswordManager
             return true;
         }
 
-        private void ImportSetting()
+        private bool ImportSetting()
         {
-            
             //設定ファイルの読み込み
-            XmlSerializer serializer = new XmlSerializer(typeof(Settings));
-            using (var reader = new StreamReader("settings.xml", Encoding.UTF8))
+            XmlSerializer serializer = new(typeof(Settings));
+            using (StreamReader reader = new("settings.xml", Encoding.UTF8))
             {
-                settings = (Settings)serializer.Deserialize(reader);
+                try
+                {
+                    settings = serializer.Deserialize(reader) as Settings;
+                }catch (InvalidOperationException)
+                {
+                   return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// settingsがnullでなければ、保存されてtrueを返す。
+        /// </summary>
+        /// <returns></returns>
+        private bool SaveSettings()
+        {
+            if(settings ==null)
+            {
+                return false;
+            }
+            else
+            {
+                XmlSerializer serializer = new(typeof(Settings));
+                using (StreamWriter writer = new("settings.xml"))
+                {
+                    serializer.Serialize(writer, settings);
+                }
+                return true;
             }
 
-            return;
+            
         }
-        private void SaveSettings()
-        {
-            XmlSerializer serializer = new XmlSerializer(typeof(Settings));
-            using (StreamWriter writer = new StreamWriter("settings.xml"))
-            {
-                serializer.Serialize(writer, settings);
-            }
-        }
+
         public void AddData(object sender, RoutedEventArgs e)
         {
-            Data data = new Data();
+            Data data = new();
             data.ShowWindow.Execute(null);
             BindingDataList.Add(data);
         }
         public void Open_Click(object sender, RoutedEventArgs e)
         {
-            Select_File();
-            var PassForm = new PasswordForm("パスワードを入力してください。");
+            var path = OpenFile();
+            if (path == null) return;
+            settings = new() { DefaultFilePath = path };
+            SaveSettings();
+            PasswordForm PassForm = new("パスワードを入力してください。");
             PassForm.ShowDialog();
             password = PassForm.Value;
             ImportData();
-
         }
         private void Save_Click(object sender, RoutedEventArgs e)
         {
@@ -215,31 +277,7 @@ namespace PasswordManager
             SaveSettings();
         }
 
-        /// <summary>
-        /// 成功したら真を返す
-        /// </summary>
-        /// <returns></returns>
-        public bool Select_File()
-        {
-            settings = new Settings();
-            var dialog = new OpenFileDialog
-            {
-                Multiselect = false,
-                Title = "作成済みのデータファイルを選択してください。",
-                AddExtension = true,
-                CheckFileExists = false,
-                Filter = "PWM Files (*.pwm)|*.pwm"
-            };
-            if ((bool)dialog.ShowDialog())
-            {
-                settings.DefaultFilePath = dialog.FileName;
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
+
 
 
         private void CheckBox_Checked(object sender, RoutedEventArgs e)
@@ -255,7 +293,7 @@ namespace PasswordManager
     public class Data : INotifyPropertyChanged
     {
         #region 記録される内容
-        public string AccountID
+        public string? AccountID
         {
             get
             {
@@ -268,7 +306,7 @@ namespace PasswordManager
             }
         }
 
-        public string URL
+        public string? URL
         {
             get { 
                 return _URL;
@@ -279,7 +317,7 @@ namespace PasswordManager
                 NotifyPropertyChanged();
             }
         }
-        public string Password
+        public string? Password
         {
             get
             {
@@ -291,7 +329,7 @@ namespace PasswordManager
                 NotifyPropertyChanged();
             }
         }
-        public string BindAddress
+        public string? BindAddress
         {
             get
             {
@@ -308,15 +346,15 @@ namespace PasswordManager
         #endregion
 
         [XmlIgnore]
-        private string _AccountID;
+        private string? _AccountID;
         [XmlIgnore]
-        private string _Password;
+        private string? _Password;
         [XmlIgnore]
-        private string _BindAddress;
+        private string? _BindAddress;
         [XmlIgnore]
-        private string _URL;
+        private string? _URL;
         [XmlIgnore]
-        public ImageSource Img
+        public ImageSource? Img
         {
             set
             {
@@ -331,7 +369,7 @@ namespace PasswordManager
             }
         }
         [XmlIgnore]
-        private ImageSource _Img;
+        private ImageSource? _Img;
         [XmlIgnore]
         public ICommand ClipPassword { get; private set; }
         [XmlIgnore]
@@ -346,7 +384,7 @@ namespace PasswordManager
             Others = new ObservableCollection<Other>();
             ClipPassword = new SimpleCommand(() => ClipboardService.SetText(Password));
             ShowWindow = new SimpleCommand(() => {
-                InputForm window = new InputForm(this);
+                InputForm window = new(this);
                 window.Show();
 
             });
@@ -356,11 +394,11 @@ namespace PasswordManager
             });
             AddPropertyChangedHandler(nameof(URL), async () => Img = await LoadfaviconFromURL(_URL));
         }
-        public event PropertyChangedEventHandler PropertyChanged = (o, e) => { };
+        public event PropertyChangedEventHandler? PropertyChanged = (o, e) => { };
 
         public void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
         {
-            PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+            PropertyChanged!(this, new PropertyChangedEventArgs(propertyName));
         }
 
         public void AddPropertyChangedHandler(string propertyName, Action action)
@@ -381,13 +419,11 @@ namespace PasswordManager
         /// </summary>
         /// <param name="url">画像データのURL(ex: http://example.com/foo.jpg) </param>
         /// <returns>         画像データ</returns>
-        private async Task<ImageSource> LoadfaviconFromURL(string url)
+        static private async Task<ImageSource?> LoadfaviconFromURL(string? url)
         {
 
  
-            //------------------------
             // パラメータチェック
-            //------------------------
             if (url == null || url.Trim().Length <= 0)
             {
                 return ImageSourceConvert.ToImageSource();
@@ -397,21 +433,22 @@ namespace PasswordManager
                 url += "/";
             }
             url += "favicon.ico";
-            //----------------------------
-            // Webサーバに要求を投げる
-            //----------------------------           
-            using (var client = new HttpClient())
+
+            // Webサーバに要求を投げる         
+            using (HttpClient client = new())
             {
-                client.Timeout = new TimeSpan(0, 0, 10);
+                client.Timeout = new(0, 0, 10);
                 try
                 {
                     byte[] response = await client.GetByteArrayAsync(url);
-                    using (MemoryStream imgStream = new MemoryStream(response))
                     return ImageSourceConvert.ToImageSource(response);
                 }
                 catch(HttpRequestException) 
                 {
                     return ImageSourceConvert.ToImageSource();
+                }
+                catch(InvalidOperationException) {
+                    return ImageSourceConvert.ToImageSource(); 
                 }
             }
                 
@@ -424,17 +461,16 @@ namespace PasswordManager
     /// </summary>
     class SimpleCommand : ICommand
     {
-        Action Comclick_event;
+        readonly Action Comclick_event;
         public SimpleCommand(Action _click_event)
         {
             Comclick_event = _click_event;
         }
 
-        public event EventHandler CanExecuteChanged;
+        public event EventHandler? CanExecuteChanged;
+        public bool CanExecute(object? parameter) => true;
 
-        public bool CanExecute(object parameter) => true;
-
-        public void Execute(object parameter)
+        public void Execute(object? parameter)
         {
             Comclick_event();
         }
@@ -447,31 +483,38 @@ namespace PasswordManager
     {
 
 
-        public static BitmapImage ToImageSource(byte[] bmp)
+        public static BitmapImage? ToImageSource(byte[] bmp)
         {
-            BitmapImage imageSource = new BitmapImage();
+            BitmapImage imageSource = new();
 
-            using (MemoryStream stream = new MemoryStream(bmp))
+            try
             {
-                stream.Seek(0, SeekOrigin.Begin);
-                imageSource.BeginInit();
-                imageSource.StreamSource = stream;
-                imageSource.CacheOption = BitmapCacheOption.OnLoad;
-                imageSource.EndInit();
+                using (MemoryStream stream = new(bmp))
+                {
+                    stream.Seek(0, SeekOrigin.Begin);
+                    imageSource.BeginInit();
+                    imageSource.StreamSource = stream;
+                    imageSource.CacheOption = BitmapCacheOption.OnLoad;
+                    imageSource.EndInit();
+                }
+                return imageSource;
             }
-            return imageSource;
+            catch (System.NotSupportedException)
+            {
+                return null;
+            }
         }
-        public static BitmapImage ToImageSource()
+        public static BitmapImage? ToImageSource()
         {
-            return null;
+            return new BitmapImage(new Uri("img_229205.png", UriKind.Relative));
         }
     }
 
 
     public class Settings
     {
-        public string DefaultFilePath;
-        public bool UseTheSameFile =true;
+        public string? DefaultFilePath;
+        public bool UseTheSameFile = true;
     }
 
 
@@ -479,8 +522,8 @@ namespace PasswordManager
 
     public class Other
     {
-        public string Key { get; set; }
-        public string Value { get; set; }
+        public string? Key { get; set; }
+        public string? Value { get; set; }
 
     }
 
@@ -489,9 +532,9 @@ namespace PasswordManager
     /// </summary>
     /// <typeparam name="TKey"></typeparam>
     /// <typeparam name="TValue"></typeparam>
-    public class SerializableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IXmlSerializable
+    public class SerializableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IXmlSerializable where TKey: notnull
     {
-        public XmlSchema GetSchema()
+        public XmlSchema? GetSchema()
         {
             return null;
         }
@@ -514,7 +557,7 @@ namespace PasswordManager
                     else
                     {
                         var item = serializer.Deserialize(reader) as KeyValueItem; // 従来はここでnullになるときがあった
-                        this.Add(item.Key, item.Value);
+                        this.Add(item!.Key!, item.Value!);
                     }
                 }
             }
@@ -539,8 +582,8 @@ namespace PasswordManager
 
         public class KeyValueItem
         {
-            public TKey Key { get; set; }
-            public TValue Value { get; set; }
+            public TKey? Key { get; set; }
+            public TValue? Value { get; set; }
 
             public KeyValueItem(TKey key, TValue value)
             {

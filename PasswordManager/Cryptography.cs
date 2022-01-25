@@ -92,7 +92,9 @@ namespace PasswordManager
 
             //共有キーと初期化ベクタを生成する
             key = deriveBytes.GetBytes(keySize / 8);
+            Console.WriteLine(key.ToString());
             iv = deriveBytes.GetBytes(blockSize / 8);
+            Console.WriteLine(iv.ToString());
         }
 
     }

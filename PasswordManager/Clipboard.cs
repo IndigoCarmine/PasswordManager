@@ -18,8 +18,9 @@ public static class ClipboardService
             return LinuxClipboard.GetText();
         }
     }
-    public static void SetText(string context)
+    public static void SetText(string? context)
     {
+        if (context == null) context = "";
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             System.Windows.Clipboard.SetText(context);

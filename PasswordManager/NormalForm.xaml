@@ -17,7 +17,7 @@
             <RowDefinition Height="5*"/>
             <RowDefinition Height="7*"/>
         </Grid.RowDefinitions>
-        <TextBox x:Name="Password" HorizontalAlignment="Stretch" VerticalAlignment="Center" Height="18" Grid.Row="1"  Grid.ColumnSpan="3" Margin="5" KeyDown="Password_KeyDown"/>
+        <TextBox x:Name="Text" HorizontalAlignment="Stretch" VerticalAlignment="Center" Height="18" Grid.Row="1"  Grid.ColumnSpan="3" Margin="5" KeyDown="OnKeyDownHandler"/>
         <TextBlock Text="{Binding}" HorizontalAlignment="Stretch" Grid.Row="0" Margin="10"  TextWrapping="Wrap" VerticalAlignment="Center"  Grid.ColumnSpan="3" />
         <Button Content="キャンセル" Grid.Column="2" Grid.Row="2" HorizontalAlignment="Center"  VerticalAlignment="Center" Width="75" Height="19" Click="Button_Click_1"/>
         <Button Grid.ColumnSpan="1" Content="決定" Grid.Column="1" HorizontalAlignment="Center"  Grid.Row="2" VerticalAlignment="Center" Width="75" Height="19" Click="Button_Click"/>
