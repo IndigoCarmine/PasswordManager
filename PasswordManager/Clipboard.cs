@@ -10,15 +10,24 @@ public static class ClipboardService
     public static string GetText()
     {
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))return System.Windows.Clipboard.GetText();
-        if(RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return LinuxClipboard.GetText();
-
-        return null;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return System.Windows.Clipboard.GetText();
+        }else
+        {
+            return LinuxClipboard.GetText();
+        }
     }
     public static void SetText(string context)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) System.Windows.Clipboard.SetText(context);
-        if(RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) LinuxClipboard.SetText(context);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            System.Windows.Clipboard.SetText(context);
+        }
+        else
+        {
+            LinuxClipboard.SetText(context);
+        }
     }
 
 }

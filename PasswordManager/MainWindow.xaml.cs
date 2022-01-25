@@ -1,24 +1,22 @@
-﻿using Microsoft.Win32;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Xml;
 using System.Xml.Serialization;
+using System.Xml.Schema;
+using Microsoft.Win32;
 
 namespace PasswordManager
 {
@@ -328,7 +326,7 @@ namespace PasswordManager
             }
             get
             {
-                if (_Img == null) return ImageSourceConvert.ToImageSource(Properties.Resources.disco);
+                if (_Img == null) return ImageSourceConvert.ToImageSource();
                 return _Img;
             }
         }
@@ -356,7 +354,7 @@ namespace PasswordManager
             {
                 Passwordb = Visibility.Visible;
             });
-            AddPropertyChangedHandler("URL", async () => Img = await LoadfaviconFromURL(_URL));
+            AddPropertyChangedHandler(nameof(URL), async () => Img = await LoadfaviconFromURL(_URL));
         }
         public event PropertyChangedEventHandler PropertyChanged = (o, e) => { };
 
@@ -367,7 +365,7 @@ namespace PasswordManager
 
         public void AddPropertyChangedHandler(string propertyName, Action action)
         {
-            if (action == null) throw new ArgumentNullException("action");
+            if (action == null) throw new ArgumentNullException(nameof(action));
 
             PropertyChanged += (o, e) =>
             {
@@ -392,9 +390,9 @@ namespace PasswordManager
             //------------------------
             if (url == null || url.Trim().Length <= 0)
             {
-                return ImageSourceConvert.ToImageSource(Properties.Resources.disco);
+                return ImageSourceConvert.ToImageSource();
             }
-            if (!("/" == url.Substring(url.Length)))
+            if (!("/" == url[url.Length..]))
             {
                 url += "/";
             }
@@ -409,19 +407,11 @@ namespace PasswordManager
                 {
                     byte[] response = await client.GetByteArrayAsync(url);
                     using (MemoryStream imgStream = new MemoryStream(response))
-                    {
-                        var bitmap = new Bitmap(imgStream);
-                        if (bitmap == null)
-                        {
-                            bitmap = Properties.Resources.disco;
-                        }
-                    
-                        return ImageSourceConvert.ToImageSource(bitmap);
-                    }
+                    return ImageSourceConvert.ToImageSource(response);
                 }
                 catch(HttpRequestException) 
                 {
-                    return ImageSourceConvert.ToImageSource(Properties.Resources.disco);
+                    return ImageSourceConvert.ToImageSource();
                 }
             }
                 
@@ -456,18 +446,24 @@ namespace PasswordManager
     static class ImageSourceConvert
     {
 
-        [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool DeleteObject([In] IntPtr hObject);
 
-        public static ImageSource ToImageSource(this Bitmap bmp)
+        public static BitmapImage ToImageSource(byte[] bmp)
         {
-            var handle = bmp.GetHbitmap();
-            try
+            BitmapImage imageSource = new BitmapImage();
+
+            using (MemoryStream stream = new MemoryStream(bmp))
             {
-                return Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                stream.Seek(0, SeekOrigin.Begin);
+                imageSource.BeginInit();
+                imageSource.StreamSource = stream;
+                imageSource.CacheOption = BitmapCacheOption.OnLoad;
+                imageSource.EndInit();
             }
-            finally { DeleteObject(handle); }
+            return imageSource;
+        }
+        public static BitmapImage ToImageSource()
+        {
+            return null;
         }
     }
 
@@ -495,12 +491,12 @@ namespace PasswordManager
     /// <typeparam name="TValue"></typeparam>
     public class SerializableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IXmlSerializable
     {
-        public System.Xml.Schema.XmlSchema GetSchema()
+        public XmlSchema GetSchema()
         {
             return null;
         }
 
-        public void ReadXml(System.Xml.XmlReader reader)
+        public void ReadXml(XmlReader reader)
         {
             var serializer = new XmlSerializer(typeof(KeyValueItem));
 
@@ -528,7 +524,7 @@ namespace PasswordManager
             }
         }
 
-        public void WriteXml(System.Xml.XmlWriter writer)
+        public void WriteXml(XmlWriter writer)
         {
             var ns = new XmlSerializerNamespaces();
             ns.Add(string.Empty, string.Empty);
