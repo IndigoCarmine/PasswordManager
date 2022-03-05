@@ -53,7 +53,8 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="   ファイル   ">
                 <MenuItem Header="開く" Click="Open_Click"></MenuItem>
-                <MenuItem Header="名前を付けて保存"></MenuItem>
+                <MenuItem Header="新規作成" Click="New_Click"></MenuItem>
+                <MenuItem Header="名前を付けて保存" Click="SaveAs_Click"></MenuItem>
                 <MenuItem Header="保存" Click="Save_Click"></MenuItem>
 
             </MenuItem>

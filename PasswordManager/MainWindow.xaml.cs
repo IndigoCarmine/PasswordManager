@@ -25,7 +25,7 @@ namespace PasswordManager
     /// </summary>
     public partial class MainWindow : Window
     {
-        readonly ObservableCollection<Data> BindingDataList = new();
+        ObservableCollection<Data> BindingDataList = new();
 
         Settings? settings;
         string? password;
@@ -133,6 +133,24 @@ namespace PasswordManager
                 return null;
             }
         }
+        static private string? SaveNewFile()
+        {
+            SaveFileDialog dialog = new()
+            {
+                Title = "保存先のファイルを選択してください。",
+                AddExtension = true,
+                CheckFileExists = false,
+                Filter = "PWM Files (*.pwm)|*.pwm"
+            };
+            if ((bool)dialog.ShowDialog()!)
+            {
+                return dialog.FileName;
+            }
+            else
+            {
+                return null;
+            }
+        }
         private void ImportData()
         {
             if (!File.Exists(settings!.DefaultFilePath))
@@ -142,34 +160,43 @@ namespace PasswordManager
             }
             else
             {
+                FileStream filestream;
                 XmlSerializer serializer = new(typeof(ObservableCollection<Data>));
-
-                using (BinaryReader v = new(new FileStream(settings!.DefaultFilePath!, FileMode.Open)))
+                try
                 {
-                    if (v.BaseStream.Length == 0) return;
-                    byte[] decstr;
-                    try
+                    filestream = new FileStream(settings!.DefaultFilePath!, FileMode.Open);
+                    using (BinaryReader v = new(filestream))
                     {
-                        decstr = Cryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password!);
-                        using (MemoryStream memoryStream = new(decstr))
+                        if (v.BaseStream.Length == 0) return;
+                        byte[] decstr;
+                        try
                         {
-
-                            BindingDataList.Clear();
-                            foreach (Data data in (ObservableCollection<Data>)(serializer.Deserialize(memoryStream)!))
+                            decstr = Cryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password!);
+                            using (MemoryStream memoryStream = new(decstr))
                             {
-                                BindingDataList.Add(data);
+
+                                BindingDataList.Clear();
+                                foreach (Data data in (ObservableCollection<Data>)(serializer.Deserialize(memoryStream)!))
+                                {
+                                    BindingDataList.Add(data);
+                                }
                             }
                         }
-                    }
-                    catch (CryptographicException)
-                    {
-                        var PassForm = new PasswordForm("パスワードが間違っています。再入力してください。");
-                        PassForm.ShowDialog();
-                        password = PassForm.Value;
-                        ImportData();
-                        return;
+                        catch (CryptographicException)
+                        {
+                            var PassForm = new PasswordForm("パスワードが間違っています。再入力してください。");
+                            PassForm.ShowDialog();
+                            password = PassForm.Value;
+                            ImportData();
+                            return;
+                        }
                     }
                 }
+                catch (FileNotFoundException)
+                {
+
+                }
+                
 
             }
 
@@ -271,14 +298,30 @@ namespace PasswordManager
             password = PassForm.Value;
             ImportData();
         }
+        public void New_Click(object sender, RoutedEventArgs e)
+        {
+            settings = new();
+            BindingDataList = new ObservableCollection<Data>();
+            this.DataContext = BindingDataList;
+        }
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             SaveData();
             SaveSettings();
         }
 
-
-
+        private void SaveAs_Click(object sender, RoutedEventArgs e)
+        {
+            settings = new();
+            settings.DefaultFilePath = SaveNewFile();
+            if(settings.DefaultFilePath == null)
+            {
+                MessageBox.Show("保存されませんでした。");
+                return;
+            }
+            SaveData();
+            SaveSettings();
+        }
 
         private void CheckBox_Checked(object sender, RoutedEventArgs e)
         {
