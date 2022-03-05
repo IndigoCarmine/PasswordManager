@@ -177,11 +177,11 @@ namespace PasswordManager
         private bool SaveData()
         {
             //初回用
-            if (password == null || password == "")
+            while(password == null || password == "")
             {
                 var PassForm = new PasswordForm("パスワードを作成してください。");
                 PassForm.ShowDialog();
-                password = PassForm.Value;
+                if (PassForm.Value != null) password = PassForm.Value;
             }
             while (settings == null || settings.DefaultFilePath == null)
             {

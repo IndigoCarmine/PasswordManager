@@ -7,7 +7,7 @@ namespace PasswordManager
     /// </summary>
     public partial class PasswordForm : Window
     {
-        public string Value { get; set; }
+        public string? Value { get; set; }
 
         public PasswordForm(string Message)
         {
@@ -31,7 +31,7 @@ namespace PasswordManager
 
         private void Password_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter) Button_Click(null, null);
+            if (e.Key == Key.Enter) Button_Click(1, new RoutedEventArgs());
         }
     }
 }

@@ -7,7 +7,7 @@ namespace PasswordManager
     /// </summary>
     public partial class InputForm : Window
     {
-        private Data SelectedData;
+        private readonly Data SelectedData;
         public InputForm(Data data)
         {
             InitializeComponent();
@@ -19,8 +19,13 @@ namespace PasswordManager
         {
             var NForm = new NormalForm("追加したい要素名を入力してください。");
             NForm.ShowDialog();
-            string key = NForm.Value;
-            SelectedData.Others.Add(new Other() { Key = key });
+            if (NForm.Value != null)
+            {
+                string key = NForm.Value;
+                SelectedData.Others.Add(new Other() { Key = key });
+            }
+            else { this.Close(); }
+
         }
     }
 }
