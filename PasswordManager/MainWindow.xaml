@@ -56,6 +56,7 @@
                 <MenuItem Header="新規作成" Click="New_Click"></MenuItem>
                 <MenuItem Header="名前を付けて保存" Click="SaveAs_Click"></MenuItem>
                 <MenuItem Header="保存" Click="Save_Click"></MenuItem>
+                <MenuItem Header="旧ファイル読み込み" Click="Import_Old_Click"></MenuItem>
 
             </MenuItem>
             <MenuItem Header="   編集   ">

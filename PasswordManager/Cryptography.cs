@@ -1,10 +1,86 @@
 ﻿using System;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography.Xml;
+using System.Security.Policy;
 using System.Windows;
+public static class Extensions
+{
+    public static T[] SubArray<T>(this T[] array, int offset, int length)
+    {
+        T[] result = new T[length];
+        Array.Copy(array, offset, result, 0, length);
+        return result;
+    }
+}
 
 namespace PasswordManager
 {
-    public static class Cryptography
+    static class NewCryptography
+    {
+        public static byte[] EncryptString(byte[] strBytes, string password, out byte[] salt)
+        {
+            salt = new byte[10];
+            RandomNumberGenerator.Fill(salt);
+
+            using (Aes aes = Aes.Create())
+            {
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+
+                byte[] key,iv;
+
+
+                GenerateKeyFromPassword(password,salt, out key,out iv);
+
+
+
+                using (ICryptoTransform cryptoTransform
+                    = aes.CreateEncryptor(key, iv))
+                {
+                    return cryptoTransform.TransformFinalBlock(strBytes, 0, strBytes.Length);
+                }
+
+            }
+        }
+        public static byte[] DecryptString(byte[] strBytes, string password)
+        {
+            byte[] salt = strBytes.SubArray(0, 10);
+            using(Aes aes = Aes.Create())
+            {
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+                byte[] key, iv;
+
+                GenerateKeyFromPassword(password, salt, out key, out iv);
+
+                using (ICryptoTransform cryptoTransform
+                    = aes.CreateDecryptor(key, iv))
+                {
+                    return cryptoTransform.TransformFinalBlock(strBytes.SubArray(10, strBytes.Length - 10), 0, strBytes.Length - 10);
+                }
+
+            }
+        }
+        private static void GenerateKeyFromPassword(string password, byte[] salt, out byte[] key,out byte[] iv)
+        {
+            //パスワードから共有キーと初期化ベクタを作成する
+            //Rfc2898DeriveBytesオブジェクトを作成する
+            Rfc2898DeriveBytes deriveBytes =
+                new Rfc2898DeriveBytes(password, salt,1000,HashAlgorithmName.SHA512);
+            //.NET Framework 1.1以下の時は、PasswordDeriveBytesを使用する
+            //System.Security.Cryptography.PasswordDeriveBytes deriveBytes =
+            //    new System.Security.Cryptography.PasswordDeriveBytes(password, salt);
+            //反復処理回数を指定する デフォルトで1000回
+
+            //共有キーを生成する
+            key = deriveBytes.GetBytes(256 / 8);
+            iv = deriveBytes.GetBytes(16);
+            
+        }
+    }
+
+    public static class OldCryptography
     {
         //拝借したもの
         /// <summary>
@@ -84,7 +160,7 @@ namespace PasswordManager
             byte[] salt = System.Text.Encoding.UTF8.GetBytes("saltは必ず8バイト以上");
             //Rfc2898DeriveBytesオブジェクトを作成する
             Rfc2898DeriveBytes deriveBytes =
-                new Rfc2898DeriveBytes(password, salt,1000,HashAlgorithmName.SHA512);
+                new Rfc2898DeriveBytes(password, salt);
             //.NET Framework 1.1以下の時は、PasswordDeriveBytesを使用する
             //System.Security.Cryptography.PasswordDeriveBytes deriveBytes =
             //    new System.Security.Cryptography.PasswordDeriveBytes(password, salt);
@@ -92,9 +168,7 @@ namespace PasswordManager
 
             //共有キーと初期化ベクタを生成する
             key = deriveBytes.GetBytes(keySize / 8);
-            MessageBox.Show(keySize.ToString());
             iv = deriveBytes.GetBytes(blockSize / 8);
-            MessageBox.Show(blockSize.ToString());
         }
 
     }

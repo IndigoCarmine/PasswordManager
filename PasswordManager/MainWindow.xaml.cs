@@ -16,7 +16,8 @@ using System.Windows.Media.Imaging;
 using System.Xml;
 using System.Xml.Serialization;
 using System.Xml.Schema;
-using Microsoft.Win32;
+
+
 
 namespace PasswordManager
 {
@@ -27,13 +28,13 @@ namespace PasswordManager
     {
         ObservableCollection<Data> BindingDataList = new();
 
-        Settings? settings;
-        string? password;
-        
+        PathGetter pathGetter = new("PWM Files (*.pwm)|*.pwm");
+        PasswordFile? passwordFile;
+        bool UseTheSameFile = false;
+
         public MainWindow()
         {
             InitializeComponent();
-            Initalize();
 
             this.Closing += new CancelEventHandler((sender, e) => {
                 MessageBoxResult messageboxResult = MessageBox.Show("保存して終了しますか。\n（はい=保存終了, いいえ=終了）", "選択", MessageBoxButton.YesNoCancel, MessageBoxImage.Exclamation);
@@ -57,58 +58,39 @@ namespace PasswordManager
                 }
             });
 
+            Initalize();
         }
 
-       
+
+        private void FirstNavigation()
+        {
+
+        }
+
+
+       /// <summary>
+       /// settings.xmlが存在していれば読み込み、
+       /// </summary>
         private void Initalize()
         {
-            bool SettingFlileExist = File.Exists("settings.xml");
-            if (!SettingFlileExist)
+            if (!File.Exists("settings.xml"))
             {
-                var result = MessageBox.Show("初回起動ですか。", "選択", MessageBoxButton.YesNo, MessageBoxImage.Error);
-                if (result == MessageBoxResult.Yes)
-                {
-                    //初回
-                    ShowIntroduction();
-                    this.DataContext = BindingDataList;
-                    return;
-                }
-                else { 
-
-                }
-            }
-            bool ReadSuccess = ImportSetting();
-            while (!(SettingFlileExist || ReadSuccess))
-            {
-                //設定ファイル紛失の２回目以降
-                var path = OpenFile();
-                if (path == null)
-                {
-                    MessageBox.Show("ファイルが選択されていません。終了します。");
-                    this.Close();
-                }
-                else
-                {
-                    settings = new() { DefaultFilePath = path };
-                    SaveSettings();
-
-                }
-                ReadSuccess = ImportSetting();
+                ShowIntroduction();
+                return;
             }
 
-            //二回目以降
-            if (settings!.UseTheSameFile)
-            {
-                var PassForm = new PasswordForm("パスワードを入力してください。");
-                PassForm.ShowDialog();
-                password = PassForm.Value;
-                ImportData();
-            }
+            Settings? settings = LoadSetting();
+            if (settings == null || settings.DefaultFilePath == null) return;
+
+            string? password = ShowPasswordForm();
+            if (password == null) return;
+
+            passwordFile = new(settings.DefaultFilePath, password);
+
+
+            BindingDataList = passwordFile.Read() ?? new();
             this.DataContext = BindingDataList;
-
             return;
-
-
         }
         /// <summary>
         /// 紹介のなにかを表示する。
@@ -117,184 +99,172 @@ namespace PasswordManager
         {
 
         }
-        static private string? OpenFile()
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="count">Passwordの再入力回数</param>
+        private void ImportData(int count = 3)
         {
-            OpenFileDialog dialog = new()
-            {
-                Multiselect = false,
-                Title = "作成済みのデータファイルを選択してください。",
-                AddExtension = true,
-                CheckFileExists = true,
-                Filter = "PWM Files (*.pwm)|*.pwm"
-            };
-            if ((bool)dialog.ShowDialog()!)
-            { 
-                return dialog.FileName;
-            }
-            else
-            {
-                return null;
-            }
-        }
-        static private string? MakeNewFile()
-        {
-            SaveFileDialog dialog = new()
-            {
-                Title = "保存先のファイルを選択してください。",
-                AddExtension = true,
-                CheckFileExists = false,
-                Filter = "PWM Files (*.pwm)|*.pwm"
-            };
-            if ((bool)dialog.ShowDialog()!)
-            {
-                return dialog.FileName;
-            }
-            else
-            {
-                return null;
-            }
-        }
-        private void ImportData()
-        {
-            if (!File.Exists(settings!.DefaultFilePath))
+            if (count < 0) return;
+            if (passwordFile == null) return;
+
+            if (!File.Exists(passwordFile.path))
             {
                 MessageBox.Show("ファイルが存在しません。消去または、移動された可能性があります。");
                 return;
             }
-            else
+
+            try
             {
-                FileStream filestream;
-                XmlSerializer serializer = new(typeof(ObservableCollection<Data>));
-                try
-                {
-                    filestream = new FileStream(settings!.DefaultFilePath!, FileMode.Open);
-                    using (BinaryReader v = new(filestream))
-                    {
-                        if (v.BaseStream.Length == 0) return;
-                        byte[] decstr;
-                        try
-                        {
-                            decstr = Cryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password!);
-                            using (MemoryStream memoryStream = new(decstr))
-                            {
-
-                                BindingDataList.Clear();
-                                foreach (Data data in (ObservableCollection<Data>)(serializer.Deserialize(memoryStream)!))
-                                {
-                                    BindingDataList.Add(data);
-                                }
-                            }
-                        }
-                        catch (CryptographicException)
-                        {
-                            var PassForm = new PasswordForm("パスワードが間違っています。再入力してください。");
-                            PassForm.ShowDialog();
-                            password = PassForm.Value;
-                            ImportData();
-                            return;
-                        }
-                    }
+                ObservableCollection<Data>? data = passwordFile.Read();
+                if(data !=null) 
+                { 
+                    BindingDataList= data;
+                    return;
                 }
-                catch (FileNotFoundException)
-                {
-
-                }
-                
-
             }
+            catch (SystemException e)
+            {
+                switch (e)
+                {
+                    case CryptographicException:
+                        var PassForm = new PasswordForm("パスワードが間違っています。再入力してください。");
+                        PassForm.ShowDialog();
+                        ShowPasswordForm();
+                        if(PassForm.Value != null) passwordFile.password = PassForm.Value;
+                        break;
+                    case IOException:
+                        MessageBox.Show("ファイルが開けません。他のアプリがファイルを開いています。");
+                        break;
+                    default:
+                        MessageBox.Show(e.ToString()); 
+                        break;
+                }
 
+                return;
+            }
         }
-        private bool SaveData()
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="count">Passwordの再設定回数</param>
+        /// <returns></returns>
+        private bool SaveData(int count=3)
         {
-            int count = 3;
-            //初回用
-            while(password == null || password == "")
-            {
-                var PassForm = new PasswordForm("パスワードを作成してください。");
-                PassForm.ShowDialog();
-                if (PassForm.Value != null) password = PassForm.Value;
-                count--;
-                if(count == 0)
-                {
-                    MessageBox.Show("保存できませんでした。");
-                    return false;
-                }
-            }
-            while (settings == null || settings.DefaultFilePath == null)
-            {
+            if (count < 0) return false;
+
+            
+            if (passwordFile == null) {
                 MessageBoxResult messageboxResult = MessageBox.Show("ファイルを新規作成しますか。 \n No=既存ファイルに上書き。", "選択", MessageBoxButton.YesNoCancel, MessageBoxImage.Error);
                 string? path = null;
                 switch (messageboxResult)
                 {
                     case MessageBoxResult.Yes:
-                        path = MakeNewFile();
+                        path = pathGetter.MakeNewFile();
                         break;
                     case MessageBoxResult.No:
-                        path = OpenFile();
+                        path = pathGetter.OpenFile();
                         break;
                     case MessageBoxResult.Cancel:
                         return false;
-                        break;
                     default:
                         break;
                 }
-                if (path ==null) break;
-                settings = new() { DefaultFilePath = path };
+                //設定されずに試行回数も超えたら終わる。
+                if (path == null) return SaveData(count - 1);
+
+                string? password = ShowPasswordForm();
+                if (password == null) return SaveData(count - 1);
+
+                passwordFile = new(path,password);
             }
 
-            XmlSerializer serializer = new(typeof(ObservableCollection<Data>));
-            using (BinaryWriter v = new(new FileStream(settings!.DefaultFilePath!, FileMode.OpenOrCreate)))
+            try
             {
-                using (MemoryStream memoryStream = new())
-                {
-                    serializer.Serialize(memoryStream, BindingDataList);
-                    byte[] bytedata = Cryptography.EncryptString(memoryStream.ToArray(), password);
-                    v.Write(bytedata, 0, bytedata.Length);
-                }
-
+                return passwordFile.Write(BindingDataList);
             }
-            return true;
+            catch (Exception e)
+            {
+                switch (e)
+                {
+                    case IOException:
+                        MessageBox.Show("ファイルが開けません。他のアプリがファイルを開いています。");
+                        break;
+                    default:
+                        MessageBox.Show("[In SaveData()] " + e.ToString());
+                        break;
+                }
+            }
+            return false;
+
         }
 
-        private bool ImportSetting()
+        /// <summary>
+        /// 設定を設定ファイルから取得する。
+        /// </summary>
+        /// <returns>失敗したときnullを返す。</returns>
+        private Settings? LoadSetting()
         {
             //設定ファイルの読み込み
+
+            if (!File.Exists("settings.xml")) return null;
             XmlSerializer serializer = new(typeof(Settings));
-            if (!File.Exists("settings.xml")) return false;
+
             using (StreamReader reader = new("settings.xml", Encoding.UTF8))
             {
                 try
                 {
-                    settings = serializer.Deserialize(reader) as Settings;
-                }catch (InvalidOperationException)
+                    return (Settings?)serializer.Deserialize(reader);
+              
+                }
+                catch (InvalidOperationException)
                 {
-                   return false;
+                   return null;
                 }
             }
-            return true;
         }
 
         /// <summary>
-        /// settingsがnullでなければ、保存されてtrueを返す。
+        /// 内部情報をもとにsettingsファイルを生成する。
         /// </summary>
-        /// <returns></returns>
+        /// <returns>成功したら真</returns>
         private bool SaveSettings()
         {
-            if(settings ==null)
+            if (passwordFile == null) return false;
+            
+            Settings settings = new();
+            settings.DefaultFilePath = passwordFile.path;
+
+            XmlSerializer serializer = new(typeof(Settings));
+            try
             {
-                return false;
-            }
-            else
-            {
-                XmlSerializer serializer = new(typeof(Settings));
                 using (StreamWriter writer = new("settings.xml"))
                 {
                     serializer.Serialize(writer, settings);
                 }
-                return true;
+            } catch (Exception ex)
+            {
+                switch (ex)
+                {
+                    case IOException: //file is
+                        return false;
+                    default:
+                        MessageBox.Show("[In SabeSattings()] "+ ex.ToString());
+                        break;
+                }
             }
+            return true;
 
             
+        }
+
+        private string? ShowPasswordForm()
+        {
+            PasswordForm PassForm = new("パスワードを入力してください。");
+            PassForm.ShowDialog();
+            return PassForm.Value;
         }
 
         public void AddData(object sender, RoutedEventArgs e)
@@ -305,18 +275,19 @@ namespace PasswordManager
         }
         public void Open_Click(object sender, RoutedEventArgs e)
         {
-            var path = OpenFile();
-            if (path == null) return;
-            settings = new() { DefaultFilePath = path };
+            string? path = pathGetter.OpenFile();
+            if(path == null) return;
+
+            string? password = ShowPasswordForm();
+            if (password == null) return;
+
+            passwordFile = new(path, password);
             SaveSettings();
-            PasswordForm PassForm = new("パスワードを入力してください。");
-            PassForm.ShowDialog();
-            password = PassForm.Value;
             ImportData();
+            this.DataContext = BindingDataList;
         }
         public void New_Click(object sender, RoutedEventArgs e)
         {
-            settings = new();
             BindingDataList = new ObservableCollection<Data>();
             this.DataContext = BindingDataList;
         }
@@ -328,24 +299,46 @@ namespace PasswordManager
 
         private void SaveAs_Click(object sender, RoutedEventArgs e)
         {
-            settings = new();
-            settings.DefaultFilePath = MakeNewFile();
-            if(settings.DefaultFilePath == null)
+            string? path = pathGetter.MakeNewFile();
+            if(path == null)
             {
                 MessageBox.Show("保存されませんでした。");
                 return;
             }
-            SaveData();
+            
+            string? password = ShowPasswordForm();
+            if (password == null) return;
+
+            passwordFile = new(path, password);
+
+            try
+            {
+                passwordFile.Write(this.BindingDataList);
+            }
+            catch(Exception ex)
+            {
+                switch (ex)
+                {
+                    case IOException:
+                        MessageBox.Show("ファイルが開けません");
+                        break;
+                    default: 
+                        MessageBox.Show("[In Save_As_Click()] "+ ex.ToString());
+                        break;
+                }
+                return;
+            }
+
             SaveSettings();
         }
 
         private void CheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            if (settings != null) settings.UseTheSameFile = true;
+            UseTheSameFile = true;
         }
         private void CheckBox_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (settings != null) settings.UseTheSameFile = true;
+           UseTheSameFile = true;
         }
 
         private void XmlView(object sender, RoutedEventArgs e)
@@ -362,314 +355,41 @@ namespace PasswordManager
 
 
         }
-    }
 
-    public class Data : INotifyPropertyChanged
-    {
-        #region 記録される内容
-        public string? AccountID
+        private void Import_Old_Click(object sender, RoutedEventArgs e)
         {
-            get
-            {
-                return _AccountID;
-            }
-            set
-            {
-                _AccountID = value;
-                NotifyPropertyChanged();
-            }
-        }
+            string? path = pathGetter.OpenFile();
+            if (path == null) return;
 
-        public string? URL
-        {
-            get { 
-                return _URL;
-            }
-            set
-            {
-                _URL = value;
-                NotifyPropertyChanged();
-            }
-        }
-        public string? Password
-        {
-            get
-            {
-                return _Password;
-            }
-            set
-            {
-                _Password = value;
-                NotifyPropertyChanged();
-            }
-        }
-        public string? BindAddress
-        {
-            get
-            {
-                return _BindAddress;
-            }
-            set
-            {
-                _BindAddress = value;
-                NotifyPropertyChanged();
-            }
-        }
-        public ObservableCollection<Other> Others { get; set; }
+            string? password = ShowPasswordForm();
+            if (password == null) return;
 
-        #endregion
-
-        [XmlIgnore]
-        private string? _AccountID;
-        [XmlIgnore]
-        private string? _Password;
-        [XmlIgnore]
-        private string? _BindAddress;
-        [XmlIgnore]
-        private string? _URL;
-        [XmlIgnore]
-        public ImageSource? Img
-        {
-            set
-            {
-                _Img = value;
-                NotifyPropertyChanged();
-
-            }
-            get
-            {
-                if (_Img == null) return ImageSourceConvert.ToImageSource();
-                return _Img;
-            }
-        }
-        [XmlIgnore]
-        private ImageSource? _Img;
-        [XmlIgnore]
-        public ICommand ClipPassword { get; private set; }
-        [XmlIgnore]
-        public ICommand ShowWindow { get; private set; }
-        [XmlIgnore]
-        public ICommand ShowPassword { get; set; }
-        [XmlIgnore]
-        public Visibility Passwordb { get; set; }
-        public Data()
-        {
-            Passwordb = Visibility.Hidden;
-            Others = new ObservableCollection<Other>();
-            ClipPassword = new SimpleCommand(() => ClipboardService.SetText(Password));
-            ShowWindow = new SimpleCommand(() => {
-                InputForm window = new(this);
-                window.Show();
-
-            });
-            ShowPassword = new SimpleCommand(() =>
-            {
-                Passwordb = Visibility.Visible;
-            });
-            AddPropertyChangedHandler(nameof(URL), async () => Img = await LoadfaviconFromURL(_URL));
-        }
-        public event PropertyChangedEventHandler? PropertyChanged = (o, e) => { };
-
-        public void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged!(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        public void AddPropertyChangedHandler(string propertyName, Action action)
-        {
-            if (action == null) throw new ArgumentNullException(nameof(action));
-
-            PropertyChanged += (o, e) =>
-            {
-                if (e.PropertyName == propertyName)
-                {
-                    action();
-                }
-            };
-        }
-
-        /// <summary>
-        /// 指定されたURLの画像をImage型オブジェクトとして取得する
-        /// </summary>
-        /// <param name="url">画像データのURL(ex: http://example.com/foo.jpg) </param>
-        /// <returns>         画像データ</returns>
-        static private async Task<ImageSource?> LoadfaviconFromURL(string? url)
-        {
-
- 
-            // パラメータチェック
-            if (url == null || url.Trim().Length <= 0)
-            {
-                return ImageSourceConvert.ToImageSource();
-            }
-            if (!("/" == url[url.Length..]))
-            {
-                url += "/";
-            }
-            url += "favicon.ico";
-
-            // Webサーバに要求を投げる         
-            using (HttpClient client = new())
-            {
-                client.Timeout = new(0, 0, 10);
-                try
-                {
-                    byte[] response = await client.GetByteArrayAsync(url);
-                    return ImageSourceConvert.ToImageSource(response);
-                }
-                catch(HttpRequestException) 
-                {
-                    return ImageSourceConvert.ToImageSource();
-                }
-                catch(InvalidOperationException) {
-                    return ImageSourceConvert.ToImageSource(); 
-                }
-            }
-                
-
-        }
-    }
-
-    /// <summary>
-    /// コマンド
-    /// </summary>
-    class SimpleCommand : ICommand
-    {
-        readonly Action Comclick_event;
-        public SimpleCommand(Action _click_event)
-        {
-            Comclick_event = _click_event;
-        }
-
-        public event EventHandler? CanExecuteChanged;
-        public bool CanExecute(object? parameter) => true;
-
-        public void Execute(object? parameter)
-        {
-            Comclick_event();
-        }
-    }
-
-    /// <summary>
-    /// ImageからImageSourceへ変更するためのクラス
-    /// </summary>
-    static class ImageSourceConvert
-    {
-
-
-        public static BitmapImage? ToImageSource(byte[] bmp)
-        {
-            BitmapImage imageSource = new();
-
+            FileStream filestream;
+            XmlSerializer serializer = new(typeof(ObservableCollection<Data>));
             try
             {
-                using (MemoryStream stream = new(bmp))
+                filestream = new FileStream(path, FileMode.Open);
+                using (BinaryReader v = new(filestream))
                 {
-                    stream.Seek(0, SeekOrigin.Begin);
-                    imageSource.BeginInit();
-                    imageSource.StreamSource = stream;
-                    imageSource.CacheOption = BitmapCacheOption.OnLoad;
-                    imageSource.EndInit();
-                }
-                return imageSource;
-            }
-            catch (System.NotSupportedException)
-            {
-                return null;
-            }
-        }
-        public static BitmapImage? ToImageSource()
-        {
-            return new BitmapImage(new Uri("img_229205.png", UriKind.Relative));
-        }
-    }
+                    if (v.BaseStream.Length == 0) return;
+                    byte[] decstr;
 
-
-    public class Settings
-    {
-        public string? DefaultFilePath;
-        public bool UseTheSameFile = true;
-    }
-
-
-
-
-    public class Other
-    {
-        public string? Key { get; set; }
-        public string? Value { get; set; }
-
-    }
-
-    /// <summary>
-    /// 拝借したもの
-    /// </summary>
-    /// <typeparam name="TKey"></typeparam>
-    /// <typeparam name="TValue"></typeparam>
-    public class SerializableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IXmlSerializable where TKey: notnull
-    {
-        public XmlSchema? GetSchema()
-        {
-            return null;
-        }
-
-        public void ReadXml(XmlReader reader)
-        {
-            var serializer = new XmlSerializer(typeof(KeyValueItem));
-
-            reader.Read();
-            if (reader.IsEmptyElement)
-                return;
-
-            try
-            {
-                while (reader.NodeType != XmlNodeType.EndElement)
-                {
-                    // これがないと下でぬるりが出る時がある
-                    if (!serializer.CanDeserialize(reader))
-                        return;
-                    else
+                    decstr = OldCryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password);
+                    using (MemoryStream memoryStream = new(decstr))
                     {
-                        var item = serializer.Deserialize(reader) as KeyValueItem; // 従来はここでnullになるときがあった
-                        this.Add(item!.Key!, item.Value!);
+                        BindingDataList = (ObservableCollection<Data>)serializer.Deserialize(memoryStream)!;
+                        this.DataContext= BindingDataList;
                     }
                 }
             }
-            finally
+            catch (FileNotFoundException)
             {
-                reader.Read();
-            }
-        }
-
-        public void WriteXml(XmlWriter writer)
-        {
-            var ns = new XmlSerializerNamespaces();
-            ns.Add(string.Empty, string.Empty);
-
-            var serializer = new XmlSerializer(typeof(KeyValueItem));
-
-            foreach (var item in this.Keys.Select(key => new KeyValueItem(key, this[key])))
-            {
-                serializer.Serialize(writer, item, ns);
-            }
-        }
-
-        public class KeyValueItem
-        {
-            public TKey? Key { get; set; }
-            public TValue? Value { get; set; }
-
-            public KeyValueItem(TKey key, TValue value)
-            {
-                Key = key;
-                Value = value;
+                return;
             }
 
-            public KeyValueItem()
-            {
-            }
         }
     }
-}
+
+ }
 
 
