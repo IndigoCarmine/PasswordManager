@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Security.Cryptography;
+using System.Windows;
 
 namespace PasswordManager
 {
@@ -83,18 +84,17 @@ namespace PasswordManager
             byte[] salt = System.Text.Encoding.UTF8.GetBytes("saltは必ず8バイト以上");
             //Rfc2898DeriveBytesオブジェクトを作成する
             Rfc2898DeriveBytes deriveBytes =
-                new Rfc2898DeriveBytes(password, salt);
+                new Rfc2898DeriveBytes(password, salt,1000,HashAlgorithmName.SHA512);
             //.NET Framework 1.1以下の時は、PasswordDeriveBytesを使用する
             //System.Security.Cryptography.PasswordDeriveBytes deriveBytes =
             //    new System.Security.Cryptography.PasswordDeriveBytes(password, salt);
             //反復処理回数を指定する デフォルトで1000回
-            deriveBytes.IterationCount = 1000;
 
             //共有キーと初期化ベクタを生成する
             key = deriveBytes.GetBytes(keySize / 8);
-            Console.WriteLine(key.ToString());
+            MessageBox.Show(keySize.ToString());
             iv = deriveBytes.GetBytes(blockSize / 8);
-            Console.WriteLine(iv.ToString());
+            MessageBox.Show(blockSize.ToString());
         }
 
     }

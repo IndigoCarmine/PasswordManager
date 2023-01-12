@@ -60,6 +60,7 @@
             </MenuItem>
             <MenuItem Header="   編集   ">
                 <MenuItem Header="追加" Click="AddData"></MenuItem>
+                <MenuItem Header="xml表示" Click="XmlView">   </MenuItem>
                 <CheckBox Content="次回も同じファイルを開く" Checked="CheckBox_Checked" Unchecked="CheckBox_Unchecked" IsChecked="true"/>
             </MenuItem>
         </Menu>

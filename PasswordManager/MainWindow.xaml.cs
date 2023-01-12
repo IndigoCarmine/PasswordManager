@@ -73,6 +73,9 @@ namespace PasswordManager
                     this.DataContext = BindingDataList;
                     return;
                 }
+                else { 
+
+                }
             }
             bool ReadSuccess = ImportSetting();
             while (!(SettingFlileExist || ReadSuccess))
@@ -133,7 +136,7 @@ namespace PasswordManager
                 return null;
             }
         }
-        static private string? SaveNewFile()
+        static private string? MakeNewFile()
         {
             SaveFileDialog dialog = new()
             {
@@ -203,27 +206,39 @@ namespace PasswordManager
         }
         private bool SaveData()
         {
+            int count = 3;
             //初回用
             while(password == null || password == "")
             {
                 var PassForm = new PasswordForm("パスワードを作成してください。");
                 PassForm.ShowDialog();
                 if (PassForm.Value != null) password = PassForm.Value;
+                count--;
+                if(count == 0)
+                {
+                    MessageBox.Show("保存できませんでした。");
+                    return false;
+                }
             }
             while (settings == null || settings.DefaultFilePath == null)
             {
-                MessageBoxResult messageboxResult = MessageBox.Show("ファイルを選択しないと保存できません。 \n 選択しますか。", "選択", MessageBoxButton.YesNo, MessageBoxImage.Error);
+                MessageBoxResult messageboxResult = MessageBox.Show("ファイルを新規作成しますか。 \n No=既存ファイルに上書き。", "選択", MessageBoxButton.YesNoCancel, MessageBoxImage.Error);
+                string? path = null;
                 switch (messageboxResult)
                 {
                     case MessageBoxResult.Yes:
+                        path = MakeNewFile();
                         break;
                     case MessageBoxResult.No:
+                        path = OpenFile();
+                        break;
+                    case MessageBoxResult.Cancel:
                         return false;
+                        break;
                     default:
                         break;
                 }
-                var path = OpenFile();
-                if (path == null) break;
+                if (path ==null) break;
                 settings = new() { DefaultFilePath = path };
             }
 
@@ -245,6 +260,7 @@ namespace PasswordManager
         {
             //設定ファイルの読み込み
             XmlSerializer serializer = new(typeof(Settings));
+            if (!File.Exists("settings.xml")) return false;
             using (StreamReader reader = new("settings.xml", Encoding.UTF8))
             {
                 try
@@ -313,7 +329,7 @@ namespace PasswordManager
         private void SaveAs_Click(object sender, RoutedEventArgs e)
         {
             settings = new();
-            settings.DefaultFilePath = SaveNewFile();
+            settings.DefaultFilePath = MakeNewFile();
             if(settings.DefaultFilePath == null)
             {
                 MessageBox.Show("保存されませんでした。");
@@ -330,6 +346,21 @@ namespace PasswordManager
         private void CheckBox_Unchecked(object sender, RoutedEventArgs e)
         {
             if (settings != null) settings.UseTheSameFile = true;
+        }
+
+        private void XmlView(object sender, RoutedEventArgs e)
+        {
+            XmlSerializer serializer = new(typeof(ObservableCollection<Data>));
+
+            using (MemoryStream memoryStream = new())
+            {
+                serializer.Serialize(memoryStream, BindingDataList);
+                string context = System.Text.Encoding.UTF8.GetString(memoryStream.ToArray());
+                MessageBox.Show(context);
+                ClipboardService.SetText(context);
+            }
+
+
         }
     }
 
