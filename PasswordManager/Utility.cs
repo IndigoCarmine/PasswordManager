@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Xml.Serialization;
 using System.Threading.Tasks;
 using System.Security.Policy;
+using System.Windows;
 
 namespace PasswordManager
 {
@@ -132,7 +133,8 @@ namespace PasswordManager
                     if (v.BaseStream.Length == 0) return null;
                     byte[] decstr;
 
-                    decstr = NewCryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password);
+                    decstr = 
+                        NewCryptography.DecryptString(v.ReadBytes((int)v.BaseStream.Length), password);
                     using (MemoryStream memoryStream = new(decstr))
                     {
                         return (ObservableCollection<Data>)serializer.Deserialize(memoryStream)!;       
@@ -160,9 +162,7 @@ namespace PasswordManager
                 using (MemoryStream memoryStream = new())
                 {
                     serializer.Serialize(memoryStream, data);
-                    byte[] salt;
-                    byte[] bytedata = NewCryptography.EncryptString(memoryStream.ToArray(), password,out salt);
-                    v.Write(salt, 0, salt.Length);
+                    byte[] bytedata = NewCryptography.EncryptString(memoryStream.ToArray(), password);
                     v.Write(bytedata,0, bytedata.Length);
                 }
 
