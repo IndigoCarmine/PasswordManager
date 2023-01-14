@@ -178,6 +178,10 @@ namespace PasswordManager
                 {
                     return ImageSourceConverter.ToImageSource();
                 }
+                catch (TaskCanceledException)
+                {
+                    return ImageSourceConverter.ToImageSource();
+                }
             }
 
 
