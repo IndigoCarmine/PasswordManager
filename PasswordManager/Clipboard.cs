@@ -12,6 +12,7 @@ public static class ClipboardService
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
+
             return System.Windows.Clipboard.GetText();
         }else
         {
@@ -23,7 +24,12 @@ public static class ClipboardService
         if (context == null) context = "";
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            System.Windows.Clipboard.SetText(context);
+            try { 
+                System.Windows.Clipboard.SetText(context);
+            }catch(COMException)
+            {
+                
+            }
         }
         else
         {
